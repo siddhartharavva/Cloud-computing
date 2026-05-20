@@ -1,16 +1,26 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile
+import logging
+
+from fastapi import APIRouter, File, UploadFile
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.services.s3_service import S3ConfigurationError, S3UploadError, upload_file_to_s3
 
 
 router = APIRouter(tags=["Upload"])
+logger = logging.getLogger(__name__)
 
 
-@router.post("/upload")
-async def upload_file(file: UploadFile = File(...)) -> dict[str, str]:
+@router.post("/upload", response_model=None)
+async def upload_file(file: UploadFile = File(...)):
     if not file.filename:
-        raise HTTPException(status_code=400, detail="Uploaded file must include a filename.")
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Uploaded file must include a filename."},
+        )
+
+    logger.info("Received upload request: filename=%s content_type=%s", file.filename, file.content_type)
+    print(f"[UPLOAD DEBUG] received filename={file.filename} content_type={file.content_type}")
 
     try:
         result = await run_in_threadpool(
@@ -20,9 +30,17 @@ async def upload_file(file: UploadFile = File(...)) -> dict[str, str]:
             file.content_type,
         )
     except S3ConfigurationError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("S3 configuration error")
+        print(f"[UPLOAD DEBUG] configuration_error={exc}")
+        return JSONResponse(status_code=500, content={"error": str(exc)})
     except S3UploadError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.exception("S3 upload error")
+        print(f"[UPLOAD DEBUG] upload_error={exc}")
+        return JSONResponse(status_code=502, content={"error": str(exc)})
+    except Exception as exc:
+        logger.exception("Unhandled upload route error")
+        print(f"[UPLOAD DEBUG] unhandled_error={exc}")
+        return JSONResponse(status_code=500, content={"error": f"Unexpected upload error: {exc}"})
 
     return {
         "message": "File uploaded successfully.",
