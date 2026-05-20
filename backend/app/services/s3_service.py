@@ -37,9 +37,6 @@ def upload_file_to_s3(
     logger.info("S3 bucket: %s", settings.s3_bucket_name)
     logger.info("AWS region: %s", settings.aws_region)
     logger.info("Generated S3 key: %s", object_key)
-    print(f"[S3 DEBUG] bucket={settings.s3_bucket_name}")
-    print(f"[S3 DEBUG] region={settings.aws_region}")
-    print(f"[S3 DEBUG] key={object_key}")
 
     client_kwargs = {
         "region_name": settings.aws_region,
@@ -53,7 +50,6 @@ def upload_file_to_s3(
     try:
         s3_client = boto3.client("s3", **client_kwargs)
         logger.info("boto3 S3 client initialized")
-        print("[S3 DEBUG] boto3 S3 client initialized")
     except (NoCredentialsError, PartialCredentialsError) as exc:
         logger.exception("AWS credentials are missing or incomplete during client initialization")
         raise S3ConfigurationError("AWS credentials are missing or incomplete.") from exc
@@ -70,7 +66,6 @@ def upload_file_to_s3(
         else:
             s3_client.upload_fileobj(file_obj, settings.s3_bucket_name, object_key)
         logger.info("S3 upload completed: s3://%s/%s", settings.s3_bucket_name, object_key)
-        print(f"[S3 DEBUG] upload complete=s3://{settings.s3_bucket_name}/{object_key}")
     except (NoCredentialsError, PartialCredentialsError) as exc:
         logger.exception("AWS credentials are missing or incomplete during upload")
         raise S3ConfigurationError("AWS credentials are missing or incomplete.") from exc
@@ -87,11 +82,6 @@ def upload_file_to_s3(
             error_message,
             bucket_region,
         )
-        print(f"[S3 DEBUG] ClientError code={error_code}")
-        print(f"[S3 DEBUG] ClientError message={error_message}")
-        if bucket_region:
-            print(f"[S3 DEBUG] bucket_region={bucket_region}")
-
         if error_code in {"NoSuchBucket", "InvalidBucketName"}:
             raise S3ConfigurationError(
                 f"S3 bucket is missing or invalid: {settings.s3_bucket_name}."

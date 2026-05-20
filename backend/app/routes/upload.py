@@ -20,7 +20,6 @@ async def upload_file(file: UploadFile = File(...)):
         )
 
     logger.info("Received upload request: filename=%s content_type=%s", file.filename, file.content_type)
-    print(f"[UPLOAD DEBUG] received filename={file.filename} content_type={file.content_type}")
 
     try:
         result = await run_in_threadpool(
@@ -31,15 +30,12 @@ async def upload_file(file: UploadFile = File(...)):
         )
     except S3ConfigurationError as exc:
         logger.exception("S3 configuration error")
-        print(f"[UPLOAD DEBUG] configuration_error={exc}")
         return JSONResponse(status_code=500, content={"error": str(exc)})
     except S3UploadError as exc:
         logger.exception("S3 upload error")
-        print(f"[UPLOAD DEBUG] upload_error={exc}")
         return JSONResponse(status_code=502, content={"error": str(exc)})
     except Exception as exc:
         logger.exception("Unhandled upload route error")
-        print(f"[UPLOAD DEBUG] unhandled_error={exc}")
         return JSONResponse(status_code=500, content={"error": f"Unexpected upload error: {exc}"})
 
     return {

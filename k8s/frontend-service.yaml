@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zero-trust-frontend-service
+  labels:
+    app: zero-trust-frontend
+spec:
+  type: LoadBalancer
+  selector:
+    app: zero-trust-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

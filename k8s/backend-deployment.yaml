@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zero-trust-backend
+  labels:
+    app: zero-trust-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zero-trust-backend
+  template:
+    metadata:
+      labels:
+        app: zero-trust-backend
+    spec:
+      containers:
+        - name: backend
+          image: zero-trust-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: AWS_REGION
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: S3_BUCKET_NAME
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: AWS_SESSION_TOKEN
+                  optional: true

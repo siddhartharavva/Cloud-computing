@@ -1,0 +1,30 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: zero-trust-backend
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - zero-trust-network
+
+  frontend:
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: zero-trust-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    networks:
+      - zero-trust-network
+
+networks:
+  zero-trust-network:
+    driver: bridge

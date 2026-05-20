@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.upload import router as upload_router
@@ -17,22 +17,6 @@ app = FastAPI(
     description="Backend API for local file upload and verification workflows.",
     version="1.0.0",
 )
-
-
-@app.middleware("http")
-async def log_cors_preflight(request: Request, call_next):
-    if request.method == "OPTIONS":
-        logging.info(
-            "CORS preflight: origin=%s method=%s headers=%s",
-            request.headers.get("origin"),
-            request.headers.get("access-control-request-method"),
-            request.headers.get("access-control-request-headers"),
-        )
-        print(f"[CORS DEBUG] origin={request.headers.get('origin')}")
-        print(f"[CORS DEBUG] request_method={request.headers.get('access-control-request-method')}")
-        print(f"[CORS DEBUG] request_headers={request.headers.get('access-control-request-headers')}")
-
-    return await call_next(request)
 
 
 app.add_middleware(
@@ -60,3 +44,5 @@ async def health_check() -> dict[str, str]:
 
 app.include_router(upload_router)
 app.include_router(verify_router)
+app.include_router(upload_router, prefix="/api")
+app.include_router(verify_router, prefix="/api")

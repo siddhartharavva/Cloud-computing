@@ -1,7 +1,7 @@
 import { awsConfig } from "../config/aws";
 import { demoFiles, demoLogs, demoMetrics } from "../data/demoData";
 
-const backendBaseUrl = awsConfig.apiBaseUrl || "http://localhost:8000";
+const backendBaseUrl = (awsConfig.apiBaseUrl || "http://localhost:8000").replace(/\/$/, "");
 const wait = (ms = 500) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function request(path, options = {}, token = "") {
@@ -55,8 +55,8 @@ export async function uploadFile({ file, form }, token, onProgress) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Upload failed with status ${response.status}`);
+    const errorMessage = await readErrorMessage(response);
+    throw new Error(errorMessage || `Upload failed with status ${response.status}`);
   }
 
   onProgress?.(100);
@@ -70,6 +70,26 @@ export async function uploadFile({ file, form }, token, onProgress) {
     storage: result.s3_key,
     message: result.message || "File uploaded successfully."
   };
+}
+
+async function readErrorMessage(response) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (response.status === 413) {
+    return "Upload failed because the selected file is too large for the current server limit.";
+  }
+
+  if (contentType.includes("application/json")) {
+    const body = await response.json();
+    return body.error || body.detail || JSON.stringify(body);
+  }
+
+  const text = await response.text();
+  if (text.trim().startsWith("<")) {
+    return `Upload failed with status ${response.status}.`;
+  }
+
+  return text;
 }
 
 export async function verifyAccess(payload, token) {
