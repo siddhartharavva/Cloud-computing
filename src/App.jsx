@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -52,14 +52,14 @@ function App() {
 
   useEffect(() => {
     const token = readTokenFromUrl();
-    const saved = localStorage.getItem("zt-user");
+    const saved = readSavedUser();
     if (token) {
       const signedIn = { ...demoUser, token };
       setUser(signedIn);
-      localStorage.setItem("zt-user", JSON.stringify(signedIn));
+      saveUser(signedIn);
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (saved) {
-      setUser(JSON.parse(saved));
+      setUser(saved);
     }
   }, []);
 
@@ -76,7 +76,7 @@ function App() {
 
   function handleDemoLogin() {
     setUser(demoUser);
-    localStorage.setItem("zt-user", JSON.stringify(demoUser));
+    saveUser(demoUser);
   }
 
   function handleCognitoLogin() {
@@ -655,6 +655,32 @@ function formatDate(value) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+function readSavedUser() {
+  try {
+    const raw = localStorage.getItem("zt-user");
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !parsed.email) {
+      localStorage.removeItem("zt-user");
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    localStorage.removeItem("zt-user");
+    return null;
+  }
+}
+
+function saveUser(user) {
+  try {
+    localStorage.setItem("zt-user", JSON.stringify(user));
+  } catch {
+    // The app can still run if browser storage is blocked.
+  }
 }
 
 export default App;
