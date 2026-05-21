@@ -30,30 +30,32 @@ def save_file_metadata(
     content_type: str | None,
     size_bytes: int,
     classification: str = "Confidential",
-    expiry_hours: int = 24,
+    expiry_hours: float = 24.0,
     allowed_ip: str = "10.0.0.0/24",
     policy: str = "MFA + corporate IP + trusted device",
     require_mfa: bool = True,
     owner: str = "member3@zerotrust.aws",
+    allowed_roles: str = "Admins,Analysts",
 ) -> dict[str, Any]:
     """Save file metadata to DynamoDB after a successful S3 upload."""
     now = datetime.now(timezone.utc)
     expiry = now + timedelta(hours=expiry_hours)
     item = {
-        "file_id": file_id,
-        "filename": filename,
-        "s3_key": s3_key,
-        "content_type": content_type or "application/octet-stream",
-        "size_bytes": size_bytes,
+        "fileId": file_id,
+        "fileName": filename,
+        "s3Key": s3_key,
+        "contentType": content_type or "application/octet-stream",
+        "sizeBytes": size_bytes,
         "classification": classification,
         "status": "Active",
         "owner": owner,
         "policy": policy,
-        "allowed_ip": allowed_ip,
-        "require_mfa": require_mfa,
-        "uploaded_at": now.isoformat(),
-        "expiry_at": expiry.isoformat(),
-        "expiry_hours": expiry_hours,
+        "allowedIP": allowed_ip,
+        "requireMFA": require_mfa,
+        "allowedRoles": allowed_roles,
+        "createdAt": now.isoformat(),
+        "expiryTime": expiry.isoformat(),
+        "expiryHours": str(expiry_hours),
     }
     try:
         table = _get_table()
@@ -69,7 +71,7 @@ def get_file_metadata(file_id: str) -> dict[str, Any] | None:
     """Get a single file record by file_id."""
     try:
         table = _get_table()
-        response = table.get_item(Key={"file_id": file_id})
+        response = table.get_item(Key={"fileId": file_id})
         return response.get("Item")
     except (ClientError, BotoCoreError) as exc:
         logger.exception("DynamoDB get_item failed for %s", file_id)
@@ -82,7 +84,7 @@ def list_files(limit: int = 50) -> list[dict[str, Any]]:
         table = _get_table()
         response = table.scan(Limit=limit)
         items = response.get("Items", [])
-        items.sort(key=lambda x: x.get("uploaded_at", ""), reverse=True)
+        items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
         return items
     except (ClientError, BotoCoreError) as exc:
         logger.exception("DynamoDB scan failed")
@@ -93,7 +95,7 @@ def delete_file_metadata(file_id: str) -> None:
     """Delete a file record from DynamoDB."""
     try:
         table = _get_table()
-        table.delete_item(Key={"file_id": file_id})
+        table.delete_item(Key={"fileId": file_id})
         logger.info("Deleted metadata for file %s from DynamoDB", file_id)
     except (ClientError, BotoCoreError) as exc:
         logger.exception("DynamoDB delete_item failed for %s", file_id)
@@ -105,7 +107,7 @@ def mark_file_expired(file_id: str) -> None:
     try:
         table = _get_table()
         table.update_item(
-            Key={"file_id": file_id},
+            Key={"fileId": file_id},
             UpdateExpression="SET #s = :expired",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":expired": "Expired"},
@@ -135,11 +137,11 @@ def get_dashboard_metrics() -> dict[str, Any]:
 
     now = datetime.now(timezone.utc)
     today_end = now.replace(hour=23, minute=59, second=59)
-    active_files = [f for f in items if f.get("status") == "Active"]
+    active_files = [f for f in items if f.get("status", "Active") == "Active"]
     expiring_today = 0
     for f in active_files:
         try:
-            expiry = datetime.fromisoformat(f["expiry_at"])
+            expiry = datetime.fromisoformat(f["expiryTime"])
             if expiry.tzinfo is None:
                 expiry = expiry.replace(tzinfo=timezone.utc)
             if expiry <= today_end:
@@ -163,7 +165,7 @@ def get_expired_files() -> list[dict[str, Any]]:
         table = _get_table()
         now = datetime.now(timezone.utc).isoformat()
         response = table.scan(
-            FilterExpression="#s = :active AND expiry_at < :now",
+            FilterExpression="#s = :active AND expiryTime < :now",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":active": "Active", ":now": now},
         )

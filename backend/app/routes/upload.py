@@ -23,6 +23,7 @@ async def upload_file(
     allowedIp: str = Form("10.0.0.0/24"),
     policy: str = Form("MFA + corporate IP + trusted device"),
     requireMfa: str = Form("true"),
+    allowedRoles: str = Form("Admins,Analysts"),
     user: dict = Depends(get_current_user),
 ):
     if not file.filename:
@@ -64,11 +65,12 @@ async def upload_file(
             content_type=file.content_type,
             size_bytes=file_size,
             classification=classification,
-            expiry_hours=int(expiryHours),
+            expiry_hours=float(expiryHours),
             allowed_ip=allowedIp,
             policy=policy,
             require_mfa=requireMfa.lower() == "true",
             owner=user.get("email", "unknown"),
+            allowed_roles=allowedRoles,
         )
     except Exception as exc:
         logger.warning("DynamoDB save failed (upload still succeeded): %s", exc)

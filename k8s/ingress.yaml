@@ -1,27 +1,91 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: zero-trust-ingress
+  name: zerotrust-ingress
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
 spec:
   rules:
     - http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: zero-trust-backend-service
-                port:
-                  number: 8000
+          # Frontend Route
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: zero-trust-frontend-service
+                name: frontend-service
+                port:
+                  number: 80
+
+          # Upload Microservice Routes
+          - path: /api/upload
+            pathType: Prefix
+            backend:
+              service:
+                name: upload-service
+                port:
+                  number: 80
+                  
+          # Auth/Zero Trust Microservice Routes
+          - path: /api/verify
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 80
+          - path: /api/access
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 80
+
+          # Lifecycle Microservice Routes
+          - path: /api/delete
+            pathType: Prefix
+            backend:
+              service:
+                name: lifecycle-service
+                port:
+                  number: 80
+          - path: /api/expiry
+            pathType: Prefix
+            backend:
+              service:
+                name: lifecycle-service
+                port:
+                  number: 80
+
+          # Audit/Dashboard Microservice Routes
+          - path: /api/dashboard
+            pathType: Prefix
+            backend:
+              service:
+                name: audit-service
+                port:
+                  number: 80
+          - path: /api/logs
+            pathType: Prefix
+            backend:
+              service:
+                name: audit-service
+                port:
+                  number: 80
+          - path: /api/alerts
+            pathType: Prefix
+            backend:
+              service:
+                name: audit-service
+                port:
+                  number: 80
+          - path: /api/services/status
+            pathType: Prefix
+            backend:
+              service:
+                name: audit-service
                 port:
                   number: 80

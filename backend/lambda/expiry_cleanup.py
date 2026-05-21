@@ -35,7 +35,7 @@ def lambda_handler(event, context):
     logger.info("Starting expiry scan at %s", now)
 
     response = table.scan(
-        FilterExpression="#s = :active AND expiry_at < :now",
+        FilterExpression="#s = :active AND expiryTime < :now",
         ExpressionAttributeNames={"#s": "status"},
         ExpressionAttributeValues={":active": "Active", ":now": now},
     )
@@ -45,14 +45,14 @@ def lambda_handler(event, context):
 
     cleaned = 0
     for item in items:
-        file_id = item.get("file_id", "unknown")
-        s3_key = item.get("s3_key", "")
+        file_id = item.get("fileId", "unknown")
+        s3_key = item.get("s3Key", "")
         try:
             if s3_key and bucket_name:
                 s3.delete_object(Bucket=bucket_name, Key=s3_key)
                 logger.info("Deleted S3 object: %s", s3_key)
             table.update_item(
-                Key={"file_id": file_id},
+                Key={"fileId": file_id},
                 UpdateExpression="SET #s = :expired",
                 ExpressionAttributeNames={"#s": "status"},
                 ExpressionAttributeValues={":expired": "Expired"},

@@ -1,30 +1,47 @@
-services:
-  backend:
-    build:
-      context: ./backend
-    container_name: zero-trust-backend
-    env_file:
-      - .env
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
-    networks:
-      - zero-trust-network
+version: '3.8'
 
+services:
+  # 1. The React Frontend & NGINX API Gateway
   frontend:
     build:
       context: .
-      args:
-        VITE_API_BASE_URL: /api
-    container_name: zero-trust-frontend
-    depends_on:
-      - backend
+      dockerfile: Dockerfile
     ports:
-      - "8080:80"
-    restart: unless-stopped
-    networks:
-      - zero-trust-network
+      - "8000:80"
+    depends_on:
+      - upload-service
+      - auth-service
+      - lifecycle-service
+      - audit-service
 
-networks:
-  zero-trust-network:
-    driver: bridge
+  # 2. Upload Microservice
+  upload-service:
+    build:
+      context: backend
+      dockerfile: microservices/upload/Dockerfile
+    env_file:
+      - .env
+
+  # 3. Auth & Zero Trust Microservice
+  auth-service:
+    build:
+      context: backend
+      dockerfile: microservices/auth/Dockerfile
+    env_file:
+      - .env
+
+  # 4. Lifecycle Microservice
+  lifecycle-service:
+    build:
+      context: backend
+      dockerfile: microservices/lifecycle/Dockerfile
+    env_file:
+      - .env
+
+  # 5. Audit Microservice
+  audit-service:
+    build:
+      context: backend
+      dockerfile: microservices/audit/Dockerfile
+    env_file:
+      - .env

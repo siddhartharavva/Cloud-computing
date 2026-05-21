@@ -61,17 +61,17 @@ async def get_current_user(
     """Validate Cognito JWT and return user claims. Allows demo tokens in demo mode."""
     if credentials is None:
         if _is_demo_mode():
-            return {"sub": "demo-user", "email": "member3@zerotrust.aws", "demo": True}
+            return {"sub": "demo-user", "email": "member3@zerotrust.aws", "groups": ["Analysts"], "demo": True}
         raise HTTPException(status_code=401, detail="Missing authorization header.")
 
     token = credentials.credentials
 
     # Allow demo token
     if token == "demo-cognito-jwt-token":
-        return {"sub": "demo-user", "email": "member3@zerotrust.aws", "demo": True}
+        return {"sub": "demo-user", "email": "member3@zerotrust.aws", "groups": ["Analysts"], "demo": True}
 
     if _is_demo_mode():
-        return {"sub": "demo-user", "email": "member3@zerotrust.aws", "demo": True}
+        return {"sub": "demo-user", "email": "member3@zerotrust.aws", "groups": ["Analysts"], "demo": True}
 
     try:
         signing_key = _get_signing_key(token)
@@ -87,6 +87,7 @@ async def get_current_user(
         return {
             "sub": claims.get("sub", ""),
             "email": claims.get("email", claims.get("cognito:username", "unknown")),
+            "groups": claims.get("cognito:groups", []),
             "demo": False,
         }
     except JWTError as exc:

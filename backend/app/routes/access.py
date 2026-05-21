@@ -28,14 +28,14 @@ async def get_secure_access(
         raise HTTPException(status_code=404, detail="File not found.")
 
     try:
-        signed_url = generate_presigned_url(file_meta["s3_key"], expires_in=300)
+        signed_url = generate_presigned_url(file_meta["s3Key"], expires_in=300)
     except Exception as exc:
         logger.exception("Failed to generate presigned URL")
         raise HTTPException(status_code=500, detail=f"Could not generate URL: {exc}") from exc
 
     put_log_event(
         "S3", "Pre-signed URL generated",
-        f"URL generated for {file_meta['filename']} by {user.get('email')}",
+        f"URL generated for {file_meta.get('fileName', 'unknown')} by {user.get('email')}",
         "success",
     )
 

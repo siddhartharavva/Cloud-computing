@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   AlertTriangle,
   Bell,
   CheckCircle2,
@@ -9,6 +10,7 @@ import {
   FileUp,
   Gauge,
   KeyRound,
+  Loader2,
   LockKeyhole,
   LogOut,
   MonitorCheck,
@@ -23,7 +25,7 @@ import {
   XCircle
 } from "lucide-react";
 import { awsConfig, buildCognitoLoginUrl, readTokenFromUrl } from "./config/aws";
-import { awsServices, demoFiles, demoLogs, demoMetrics, demoUser } from "./data/demoData";
+import { demoFiles, demoLogs, demoMetrics, demoUser } from "./data/demoData";
 import {
   deleteFile,
   getDashboard,
@@ -38,23 +40,30 @@ const navItems = [
   { id: "dashboard", label: "Dashboard", icon: Gauge },
   { id: "upload", label: "Upload", icon: FileUp },
   { id: "access", label: "Access", icon: ShieldCheck },
-  { id: "logs", label: "Logs", icon: MonitorCheck },
-  { id: "architecture", label: "AWS Flow", icon: Workflow }
+  { id: "logs", label: "Monitoring & Alerts", icon: Activity }
 ];
 
 function App() {
   const [user, setUser] = useState(null);
   const [activeView, setActiveView] = useState("dashboard");
-  const [files, setFiles] = useState(demoFiles);
-  const [logs, setLogs] = useState(demoLogs);
-  const [metrics, setMetrics] = useState(demoMetrics);
+  const [files, setFiles] = useState(awsConfig.demoMode ? demoFiles : []);
+  const [metrics, setMetrics] = useState(awsConfig.demoMode ? demoMetrics : {
+    totalFiles: 0, verifiedAccess: 0, blockedAttempts: 0, expiringToday: 0
+  });
+  const [logs, setLogs] = useState(awsConfig.demoMode ? demoLogs : []);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
     const token = readTokenFromUrl();
     const saved = readSavedUser();
     if (token) {
-      const signedIn = { ...demoUser, token };
+      let email = "cognito-user@aws";
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (payload.email) email = payload.email;
+      } catch (e) {}
+
+      const signedIn = { email, token };
       setUser(signedIn);
       saveUser(signedIn);
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -63,26 +72,35 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
+  async function refreshDashboard() {
     if (!user) return;
-    getDashboard(user.token)
-      .then((data) => {
-        setMetrics(data.metrics || demoMetrics);
-        setFiles(data.files || demoFiles);
-        setLogs(data.logs || demoLogs);
-      })
-      .catch((error) => setToast(error.message));
+    try {
+      const data = await getDashboard(user.token);
+      setMetrics(data.metrics || demoMetrics);
+      setFiles(data.files || demoFiles);
+      setLogs(data.logs || demoLogs);
+    } catch (error) {
+      setToast(error.message);
+    }
+  }
+
+  useEffect(() => {
+    refreshDashboard();
   }, [user]);
 
-  function handleDemoLogin() {
-    setUser(demoUser);
-    saveUser(demoUser);
-  }
+  useEffect(() => {
+    const handleExpired = () => {
+      logout();
+      setTimeout(() => alert("Your session has expired. Please log in again to continue accessing or uploading files."), 100);
+    };
+    window.addEventListener("session-expired", handleExpired);
+    return () => window.removeEventListener("session-expired", handleExpired);
+  }, []);
 
   function handleCognitoLogin() {
     const url = buildCognitoLoginUrl();
     if (!url) {
-      setToast("Add Cognito domain and client ID in .env, or use demo login.");
+      setToast("Add Cognito domain and client ID in .env.");
       return;
     }
     window.location.href = url;
@@ -93,8 +111,12 @@ function App() {
     localStorage.removeItem("zt-user");
   }
 
+  function pageTitle(id) {
+    return navItems.find(n => n.id === id)?.label || "Dashboard";
+  }
+
   if (!user) {
-    return <LoginScreen onDemoLogin={handleDemoLogin} onCognitoLogin={handleCognitoLogin} />;
+    return <LoginScreen onCognitoLogin={handleCognitoLogin} />;
   }
 
   return (
@@ -165,7 +187,7 @@ function App() {
           <UploadPanel
             token={user.token}
             onUploaded={(file) => {
-              setFiles((current) => [normalizeUploadedFile(file), ...current]);
+              refreshDashboard();
               setToast(file.message || "Upload complete.");
             }}
           />
@@ -175,7 +197,7 @@ function App() {
             token={user.token}
             files={files}
             onDeleted={(fileId, message) => {
-              setFiles((current) => current.filter((file) => file.id !== fileId));
+              refreshDashboard();
               setToast(message);
             }}
           />
@@ -188,13 +210,12 @@ function App() {
             onToast={setToast}
           />
         )}
-        {activeView === "architecture" && <ArchitecturePanel />}
       </main>
     </div>
   );
 }
 
-function LoginScreen({ onDemoLogin, onCognitoLogin }) {
+function LoginScreen({ onCognitoLogin }) {
   return (
     <main className="login-screen">
       <section className="login-visual" aria-label="Platform preview">
@@ -215,11 +236,7 @@ function LoginScreen({ onDemoLogin, onCognitoLogin }) {
           and suspicious access alerts.
         </p>
         <div className="login-actions">
-          <button className="primary-button" onClick={onDemoLogin}>
-            <ShieldCheck size={18} />
-            Demo Login
-          </button>
-          <button className="secondary-button" onClick={onCognitoLogin}>
+          <button className="primary-button" onClick={onCognitoLogin}>
             <UserRound size={18} />
             Cognito Login
           </button>
@@ -294,14 +311,33 @@ function UploadPanel({ token, onUploaded }) {
   const [form, setForm] = useState({
     classification: "Confidential",
     expiryHours: "24",
-    allowedIp: "10.0.0.0/24",
     requireMfa: true,
-    policy: "MFA + corporate IP + trusted device"
+    allowedIp: "10.0.0.0/24",
+    requireTrustedDevice: true,
+    allowedRoles: {
+      Admins: true,
+      Analysts: true,
+      Guests: false
+    }
   });
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState("");
+
+  useEffect(() => {
+    if (form.classification === "Confidential") {
+      setForm(prev => ({
+        ...prev,
+        allowedRoles: { ...prev.allowedRoles, Analysts: false, Guests: false }
+      }));
+    } else if (form.classification === "Internal") {
+      setForm(prev => ({
+        ...prev,
+        allowedRoles: { ...prev.allowedRoles, Guests: false }
+      }));
+    }
+  }, [form.classification]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -311,7 +347,20 @@ function UploadPanel({ token, onUploaded }) {
     setUploadError("");
 
     try {
-      const result = await uploadFile({ file: selectedFile, form }, token, setProgress);
+      const uploadForm = {
+        classification: form.classification,
+        expiryHours: form.expiryHours,
+        allowedIp: form.allowedIp || "0.0.0.0/0",
+        requireMfa: form.requireMfa,
+        allowedRoles: Object.keys(form.allowedRoles).filter(r => form.allowedRoles[r]).join(","),
+        policy: [
+          form.requireMfa && "MFA",
+          form.allowedIp && `IP restricted`,
+          form.requireTrustedDevice && "trusted device"
+        ].filter(Boolean).join(" + ") || "Open Access"
+      };
+
+      const result = await uploadFile({ file: selectedFile, form: uploadForm }, token, setProgress);
       setUploadResult(result);
       onUploaded(result);
     } catch (error) {
@@ -351,30 +400,77 @@ function UploadPanel({ token, onUploaded }) {
           <label>
             Expiry window
             <select value={form.expiryHours} onChange={(event) => setForm({ ...form, expiryHours: event.target.value })}>
+              <option value="0.01666667">1 minute</option>
+              <option value="0.16666667">10 minutes</option>
               <option value="1">1 hour</option>
               <option value="6">6 hours</option>
               <option value="24">24 hours</option>
               <option value="72">72 hours</option>
             </select>
           </label>
-          <label>
-            Allowed IP range
-            <input value={form.allowedIp} onChange={(event) => setForm({ ...form, allowedIp: event.target.value })} />
-          </label>
-          <label>
-            Policy rule
-            <input value={form.policy} onChange={(event) => setForm({ ...form, policy: event.target.value })} />
-          </label>
         </div>
 
-        <label className="toggle-row">
-          <input
-            type="checkbox"
-            checked={form.requireMfa}
-            onChange={(event) => setForm({ ...form, requireMfa: event.target.checked })}
-          />
-          <span>Require MFA verified Cognito identity before file access</span>
-        </label>
+        <div className="policy-checkboxes">
+          <strong>Allowed Roles</strong>
+          <div style={{ display: "flex", gap: "24px", marginBottom: "8px" }}>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={form.allowedRoles.Admins}
+                onChange={(event) => setForm({ ...form, allowedRoles: { ...form.allowedRoles, Admins: event.target.checked } })}
+              />
+              <span>Admins</span>
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={form.allowedRoles.Analysts}
+                disabled={form.classification === "Confidential"}
+                onChange={(event) => setForm({ ...form, allowedRoles: { ...form.allowedRoles, Analysts: event.target.checked } })}
+              />
+              <span>Analysts</span>
+            </label>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={form.allowedRoles.Guests}
+                disabled={form.classification === "Confidential" || form.classification === "Internal"}
+                onChange={(event) => setForm({ ...form, allowedRoles: { ...form.allowedRoles, Guests: event.target.checked } })}
+              />
+              <span>Guests</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="policy-checkboxes">
+          <strong>Access Policy Requirements</strong>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={form.requireMfa}
+              onChange={(event) => setForm({ ...form, requireMfa: event.target.checked })}
+            />
+            <span>Require MFA verified Cognito identity</span>
+          </label>
+          <label className="toggle-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.2rem" }}>
+            <span>Allowed IP Range (CIDR)</span>
+            <input
+              type="text"
+              value={form.allowedIp}
+              onChange={(event) => setForm({ ...form, allowedIp: event.target.value })}
+              placeholder="e.g. 10.0.0.0/24 or 0.0.0.0/0"
+              style={{ width: "100%", padding: "0.5rem", borderRadius: "4px", border: "1px solid var(--border)", background: "var(--panel-bg)", color: "var(--text-main)" }}
+            />
+          </label>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={form.requireTrustedDevice}
+              onChange={(event) => setForm({ ...form, requireTrustedDevice: event.target.checked })}
+            />
+            <span>Require Trusted Device posture</span>
+          </label>
+        </div>
 
         <div className="progress-track" aria-label="Upload progress">
           <span style={{ width: `${progress}%` }} />
@@ -404,15 +500,22 @@ function UploadPanel({ token, onUploaded }) {
 }
 
 function AccessPanel({ token, files, onDeleted }) {
-  const [selectedId, setSelectedId] = useState(files[0]?.id || "");
+  const [selectedId, setSelectedId] = useState("");
   const [context, setContext] = useState({
-    sourceIp: "10.0.0.42",
     deviceTrust: "trusted",
-    role: "analyst",
-    expired: false
+    role: "analyst"
   });
   const [decision, setDecision] = useState(null);
   const [signedUrl, setSignedUrl] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (files.length > 0 && !files.find(f => f.id === selectedId)) {
+      setSelectedId(files[0].id);
+    }
+  }, [files, selectedId]);
 
   const selectedFile = useMemo(
     () => files.find((file) => file.id === selectedId) || files[0],
@@ -420,20 +523,42 @@ function AccessPanel({ token, files, onDeleted }) {
   );
 
   async function runVerification() {
-    const result = await verifyAccess({ fileId: selectedFile?.id, ...context }, token);
-    setDecision(result);
-    setSignedUrl("");
+    setIsVerifying(true);
+    try {
+      const result = await verifyAccess({ fileId: selectedFile?.id, ...context }, token);
+      setDecision(result);
+      setSignedUrl("");
+    } finally {
+      setIsVerifying(false);
+    }
   }
 
   async function requestAccess() {
-    const result = await getSecureAccess(selectedFile.id, token);
-    setSignedUrl(result.signedUrl);
+    setIsGenerating(true);
+    try {
+      const result = await getSecureAccess(selectedFile.id, token);
+      setSignedUrl(result.signedUrl);
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   async function removeFile() {
-    const result = await deleteFile(selectedFile.id, token);
-    onDeleted(selectedFile.id, result.message);
-    setDecision(null);
+    setIsDeleting(true);
+    try {
+      const result = await deleteFile(selectedFile.id, token);
+      onDeleted(selectedFile.id, result.message);
+      setDecision(null);
+    } catch (error) {
+      let msg = error.message;
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.detail) msg = parsed.detail;
+      } catch(e) {}
+      alert(`Deletion Failed: ${msg}`);
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   return (
@@ -447,10 +572,7 @@ function AccessPanel({ token, files, onDeleted }) {
               {files.map((file) => <option key={file.id} value={file.id}>{file.name}</option>)}
             </select>
           </label>
-          <label>
-            Source IP
-            <input value={context.sourceIp} onChange={(event) => setContext({ ...context, sourceIp: event.target.value })} />
-          </label>
+
           <label>
             Device trust
             <select value={context.deviceTrust} onChange={(event) => setContext({ ...context, deviceTrust: event.target.value })}>
@@ -458,37 +580,22 @@ function AccessPanel({ token, files, onDeleted }) {
               <option value="untrusted">Untrusted device</option>
             </select>
           </label>
-          <label>
-            User role
-            <select value={context.role} onChange={(event) => setContext({ ...context, role: event.target.value })}>
-              <option value="analyst">Analyst</option>
-              <option value="admin">Admin</option>
-              <option value="guest">Guest</option>
-            </select>
-          </label>
+
         </div>
 
-        <label className="toggle-row">
-          <input
-            type="checkbox"
-            checked={context.expired}
-            onChange={(event) => setContext({ ...context, expired: event.target.checked })}
-          />
-          <span>Simulate expired access window</span>
-        </label>
 
         <div className="button-row">
-          <button className="primary-button" onClick={runVerification}>
-            <ShieldCheck size={18} />
-            Verify Access
+          <button className="primary-button" onClick={runVerification} disabled={isVerifying}>
+            {isVerifying ? <Loader2 size={18} className="spin" /> : <ShieldCheck size={18} />}
+            {isVerifying ? "Verifying..." : "Verify Access"}
           </button>
-          <button className="secondary-button" onClick={requestAccess} disabled={!decision || decision.decision !== "ALLOW"}>
-            <KeyRound size={18} />
-            Generate URL
+          <button className="secondary-button" onClick={requestAccess} disabled={!decision || decision.decision !== "ALLOW" || isGenerating}>
+            {isGenerating ? <Loader2 size={18} className="spin" /> : <KeyRound size={18} />}
+            {isGenerating ? "Generating..." : "Generate URL"}
           </button>
-          <button className="danger-button" onClick={removeFile} disabled={!selectedFile}>
-            <Trash2 size={18} />
-            Delete
+          <button className="danger-button" onClick={removeFile} disabled={!selectedFile || isDeleting}>
+            {isDeleting ? <Loader2 size={18} className="spin" /> : <Trash2 size={18} />}
+            {isDeleting ? "Deleting..." : "Delete"}
           </button>
         </div>
       </section>
@@ -503,9 +610,9 @@ function AccessPanel({ token, files, onDeleted }) {
             <p>{decision.reason}</p>
             <div className="check-list">
               {decision.checks.map((check) => (
-                <span key={check.name}>
-                  {check.passed ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                  {check.name}
+                <span key={check.name} style={{ color: check.passed ? "var(--green)" : "var(--red)" }}>
+                  {check.passed ? <CheckCircle2 size={16} color="var(--green)" /> : <XCircle size={16} color="var(--red)" />}
+                  {check.passed ? "Passed:" : "Failed:"} {check.name}
                 </span>
               ))}
             </div>
@@ -529,15 +636,28 @@ function AccessPanel({ token, files, onDeleted }) {
 }
 
 function LogsPanel({ token, logs, setLogs, onToast }) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+
   async function refreshLogs() {
-    const data = await getLogs(token);
-    setLogs(data.logs || []);
-    onToast("Logs refreshed from CloudWatch-style stream.");
+    setIsRefreshing(true);
+    try {
+      const data = await getLogs(token);
+      setLogs(data.logs || []);
+      onToast("Logs refreshed from CloudWatch-style stream.");
+    } finally {
+      setIsRefreshing(false);
+    }
   }
 
   async function sendAlert() {
-    const result = await triggerTestAlert(token);
-    onToast(result.message);
+    setIsTesting(true);
+    try {
+      const result = await triggerTestAlert(token);
+      onToast(result.message);
+    } finally {
+      setIsTesting(false);
+    }
   }
 
   return (
@@ -548,49 +668,18 @@ function LogsPanel({ token, logs, setLogs, onToast }) {
           <p>Display CloudWatch events, CloudTrail audit records, GuardDuty findings, and SNS alert status.</p>
         </div>
         <div className="button-row">
-          <button className="secondary-button" onClick={refreshLogs}>
-            <RefreshCcw size={18} />
-            Refresh
+          <button className="secondary-button" onClick={refreshLogs} disabled={isRefreshing}>
+            {isRefreshing ? <Loader2 size={18} className="spin" /> : <RefreshCcw size={18} />}
+            {isRefreshing ? "Refreshing..." : "Refresh"}
           </button>
-          <button className="primary-button" onClick={sendAlert}>
-            <Bell size={18} />
-            Test SNS
+          <button className="primary-button" onClick={sendAlert} disabled={isTesting}>
+            {isTesting ? <Loader2 size={18} className="spin" /> : <Bell size={18} />}
+            {isTesting ? "Testing..." : "Test SNS"}
           </button>
         </div>
       </div>
       <LogList logs={logs} />
     </section>
-  );
-}
-
-function ArchitecturePanel() {
-  return (
-    <div className="content-grid">
-      <section className="panel wide">
-        <h2>AWS Workflow</h2>
-        <div className="flow-diagram">
-          {["Cognito Login", "React UI", "API Gateway", "Lambda Zero Trust", "S3 + KMS", "DynamoDB", "CloudWatch", "EventBridge", "SNS Alert"].map((step, index) => (
-            <div className="flow-step" key={step}>
-              <span>{index + 1}</span>
-              <strong>{step}</strong>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel wide">
-        <h2>AWS Services Covered</h2>
-        <div className="service-grid">
-          {awsServices.map((service) => (
-            <article key={service.name} className="service-card">
-              <strong>{service.name}</strong>
-              <span>{service.purpose}</span>
-              <em>{service.state}</em>
-            </article>
-          ))}
-        </div>
-      </section>
-    </div>
   );
 }
 
@@ -648,8 +737,7 @@ function pageTitle(activeView) {
     dashboard: "Security Operations Dashboard",
     upload: "Upload and Policy Assignment",
     access: "Zero Trust Access Verification",
-    logs: "Monitoring, Audit, and Alerts",
-    architecture: "AWS Architecture and Service Coverage"
+    logs: "Monitoring, Audit, and Alerts"
   };
   return titles[activeView];
 }

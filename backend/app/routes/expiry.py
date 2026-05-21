@@ -27,11 +27,11 @@ async def run_expiry_scan(
     cleaned = 0
     for f in expired_files:
         try:
-            delete_s3_object(f["s3_key"])
-            mark_file_expired(f["file_id"])
+            delete_s3_object(f["s3Key"])
+            mark_file_expired(f["fileId"])
             cleaned += 1
         except Exception as exc:
-            logger.warning("Failed to clean up file %s: %s", f.get("file_id"), exc)
+            logger.warning("Failed to clean up file %s: %s", f.get("fileId"), exc)
 
     put_log_event(
         "EventBridge", "Lifecycle check",

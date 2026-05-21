@@ -25,6 +25,9 @@ async function request(path, options = {}, token = "") {
 
   if (!response.ok) {
     const text = await response.text();
+    if (response.status === 401 && (text.includes("Signature has expired") || text.includes("Invalid token"))) {
+      window.dispatchEvent(new CustomEvent("session-expired"));
+    }
     throw new Error(text || `Request failed with status ${response.status}`);
   }
 
@@ -61,6 +64,9 @@ export async function uploadFile({ file, form }, token, onProgress) {
 
   if (!response.ok) {
     const errorMessage = await readErrorMessage(response);
+    if (response.status === 401 && (errorMessage.includes("Signature has expired") || errorMessage.includes("Invalid token"))) {
+      window.dispatchEvent(new CustomEvent("session-expired"));
+    }
     throw new Error(errorMessage || `Upload failed with status ${response.status}`);
   }
 

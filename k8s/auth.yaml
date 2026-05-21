@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zerotrust-auth
+  labels:
+    app: auth
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      containers:
+      - name: auth
+        image: <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/zerotrust-auth:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: COGNITO_USER_POOL_ID
+          value: "eu-north-1_i5O7IJ3CU"
+        - name: COGNITO_APP_CLIENT_ID
+          value: "4i64tnt2k5o9k9v1s0q9v4b8b"
+        - name: COGNITO_REGION
+          value: "eu-north-1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+spec:
+  type: ClusterIP
+  selector:
+    app: auth
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80

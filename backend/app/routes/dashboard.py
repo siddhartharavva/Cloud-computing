@@ -29,14 +29,14 @@ def _format_file_for_frontend(item: dict) -> dict:
         size_str = f"{size_bytes} B"
 
     return {
-        "id": item.get("file_id", ""),
-        "name": item.get("filename", "unknown"),
+        "id": item.get("fileId", ""),
+        "name": item.get("fileName", "unknown"),
         "owner": item.get("owner", "unknown"),
         "size": size_str,
         "classification": item.get("classification", "Internal"),
         "status": item.get("status", "Active"),
-        "expiry": item.get("expiry_at", ""),
-        "storage": f"s3://bucket/{item.get('s3_key', '')}",
+        "expiry": item.get("expiryTime", ""),
+        "storage": f"s3://bucket/{item.get('s3Key', '')}",
         "kmsKey": "alias/zt-file-exchange",
         "lastAccess": "via API",
         "policy": item.get("policy", ""),
