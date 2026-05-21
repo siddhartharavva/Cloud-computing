@@ -9,13 +9,18 @@ async function request(path, options = {}, token = "") {
     return mockRequest(path, options);
   }
 
+  const headers = { ...options.headers };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  // Only set Content-Type for JSON bodies, not FormData
+  if (options.body && !(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const response = await fetch(`${awsConfig.apiBaseUrl}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers
-    }
+    headers
   });
 
   if (!response.ok) {
@@ -111,6 +116,10 @@ export async function triggerTestAlert(token) {
   return request("/alerts/test", { method: "POST", body: JSON.stringify({ type: "demo-suspicious-access" }) }, token);
 }
 
+export async function getServiceStatus(token) {
+  return request("/services/status", {}, token);
+}
+
 async function mockRequest(path, options = {}) {
   await wait();
 
@@ -164,6 +173,10 @@ async function mockRequest(path, options = {}) {
 
   if (path === "/alerts/test") {
     return { message: "SNS alert sent to the security notification topic." };
+  }
+
+  if (path === "/services/status") {
+    return { services: [] };
   }
 
   return {};

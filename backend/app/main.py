@@ -3,6 +3,13 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routes.access import router as access_router
+from app.routes.alerts import router as alerts_router
+from app.routes.dashboard import router as dashboard_router
+from app.routes.delete import router as delete_router
+from app.routes.expiry import router as expiry_router
+from app.routes.logs import router as logs_router
+from app.routes.services_status import router as services_router
 from app.routes.upload import router as upload_router
 from app.routes.verify import router as verify_router
 
@@ -14,8 +21,8 @@ logging.basicConfig(
 
 app = FastAPI(
     title="Zero Trust File Verification System",
-    description="Backend API for local file upload and verification workflows.",
-    version="1.0.0",
+    description="Backend API for secure file upload, Zero Trust verification, monitoring, and lifecycle enforcement.",
+    version="2.0.0",
 )
 
 
@@ -42,7 +49,19 @@ async def health_check() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-app.include_router(upload_router)
-app.include_router(verify_router)
-app.include_router(upload_router, prefix="/api")
-app.include_router(verify_router, prefix="/api")
+# Register all routers at / and /api (for ingress/nginx compatibility)
+_all_routers = [
+    upload_router,
+    verify_router,
+    dashboard_router,
+    logs_router,
+    access_router,
+    delete_router,
+    alerts_router,
+    expiry_router,
+    services_router,
+]
+
+for _router in _all_routers:
+    app.include_router(_router)
+    app.include_router(_router, prefix="/api")

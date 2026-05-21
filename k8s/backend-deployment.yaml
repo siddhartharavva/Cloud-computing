@@ -21,6 +21,7 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            # AWS Core
             - name: AWS_REGION
               valueFrom:
                 secretKeyRef:
@@ -46,4 +47,65 @@ spec:
                 secretKeyRef:
                   name: zero-trust-aws-secrets
                   key: AWS_SESSION_TOKEN
+                  optional: true
+            # DynamoDB
+            - name: DYNAMODB_TABLE_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: DYNAMODB_TABLE_NAME
+                  optional: true
+            # KMS
+            - name: KMS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: KMS_KEY_ID
+                  optional: true
+            # Cognito
+            - name: COGNITO_USER_POOL_ID
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: COGNITO_USER_POOL_ID
+                  optional: true
+            - name: COGNITO_APP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: COGNITO_APP_CLIENT_ID
+                  optional: true
+            - name: COGNITO_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: COGNITO_REGION
+                  optional: true
+            # SNS
+            - name: SNS_TOPIC_ARN
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: SNS_TOPIC_ARN
+                  optional: true
+            # SQS
+            - name: SQS_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: SQS_QUEUE_URL
+                  optional: true
+            # CloudWatch
+            - name: CLOUDWATCH_LOG_GROUP
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: CLOUDWATCH_LOG_GROUP
+                  optional: true
+            # Secrets Manager
+            - name: SECRETS_MANAGER_SECRET_ID
+              valueFrom:
+                secretKeyRef:
+                  name: zero-trust-aws-secrets
+                  key: SECRETS_MANAGER_SECRET_ID
                   optional: true

@@ -94,16 +94,20 @@ export const demoMetrics = {
 };
 
 export const awsServices = [
-  { name: "Cognito", purpose: "Authentication", state: "Online" },
-  { name: "API Gateway", purpose: "Secure endpoints", state: "Online" },
-  { name: "Lambda", purpose: "Zero Trust engine", state: "Online" },
-  { name: "S3", purpose: "Encrypted storage", state: "Online" },
-  { name: "DynamoDB", purpose: "Metadata and policies", state: "Online" },
-  { name: "KMS", purpose: "Encryption keys", state: "Online" },
-  { name: "EventBridge", purpose: "Expiry automation", state: "Scheduled" },
-  { name: "CloudWatch", purpose: "Logs and metrics", state: "Streaming" },
-  { name: "CloudTrail", purpose: "Audit trail", state: "Recording" },
-  { name: "GuardDuty", purpose: "Threat monitoring", state: "Monitoring" },
-  { name: "SNS", purpose: "Security alerts", state: "Armed" },
-  { name: "IAM", purpose: "Least privilege", state: "Enforced" }
+  { name: "Cognito", purpose: "User authentication & JWT tokens", state: "Online" },
+  { name: "API Gateway", purpose: "Secure REST endpoints", state: "Online" },
+  { name: "Lambda", purpose: "Zero Trust verification engine", state: "Online" },
+  { name: "S3", purpose: "KMS-encrypted file storage", state: "Online" },
+  { name: "DynamoDB", purpose: "File metadata & access policies", state: "Online" },
+  { name: "KMS", purpose: "Server-side encryption keys", state: "Online" },
+  { name: "SNS", purpose: "Security alert notifications", state: "Armed" },
+  { name: "SQS", purpose: "Async event processing queue", state: "Listening" },
+  { name: "EventBridge", purpose: "Scheduled expiry automation", state: "Scheduled" },
+  { name: "CloudWatch", purpose: "Logs, metrics & dashboards", state: "Streaming" },
+  { name: "CloudTrail", purpose: "API audit trail recording", state: "Recording" },
+  { name: "GuardDuty", purpose: "Threat & anomaly detection", state: "Monitoring" },
+  { name: "Secrets Manager", purpose: "Secure config storage", state: "Active" },
+  { name: "IAM", purpose: "Least-privilege access control", state: "Enforced" },
+  { name: "ECR", purpose: "Container image registry", state: "Online" },
+  { name: "EKS", purpose: "Kubernetes orchestration", state: "Planned" }
 ];

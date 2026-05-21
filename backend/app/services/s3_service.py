@@ -57,14 +57,21 @@ def upload_file_to_s3(
         logger.exception("Failed to initialize boto3 S3 client")
         raise S3ConfigurationError(f"Failed to initialize S3 client: {exc}") from exc
 
-    extra_args = {"ContentType": content_type} if content_type else None
+    extra_args = {}
+    if content_type:
+        extra_args["ContentType"] = content_type
+    if settings.kms_key_id:
+        extra_args["ServerSideEncryption"] = "aws:kms"
+        extra_args["SSEKMSKeyId"] = settings.kms_key_id
 
     try:
         file_obj.seek(0)
-        if extra_args:
-            s3_client.upload_fileobj(file_obj, settings.s3_bucket_name, object_key, ExtraArgs=extra_args)
-        else:
-            s3_client.upload_fileobj(file_obj, settings.s3_bucket_name, object_key)
+        s3_client.upload_fileobj(
+            file_obj,
+            settings.s3_bucket_name,
+            object_key,
+            ExtraArgs=extra_args if extra_args else None,
+        )
         logger.info("S3 upload completed: s3://%s/%s", settings.s3_bucket_name, object_key)
     except (NoCredentialsError, PartialCredentialsError) as exc:
         logger.exception("AWS credentials are missing or incomplete during upload")
@@ -107,6 +114,46 @@ def upload_file_to_s3(
         "filename": original_filename,
         "s3_key": object_key,
     }
+
+
+def generate_presigned_url(
+    s3_key: str,
+    expires_in: int = 300,
+    settings: Settings | None = None,
+) -> str:
+    """Generate a temporary pre-signed URL for secure file download."""
+    settings = settings or get_settings()
+    client_kwargs = {
+        "region_name": settings.aws_region,
+        "aws_access_key_id": settings.aws_access_key_id,
+        "aws_secret_access_key": settings.aws_secret_access_key,
+    }
+    if settings.aws_session_token:
+        client_kwargs["aws_session_token"] = settings.aws_session_token
+    s3 = boto3.client("s3", **client_kwargs)
+    return s3.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": settings.s3_bucket_name, "Key": s3_key},
+        ExpiresIn=expires_in,
+    )
+
+
+def delete_s3_object(
+    s3_key: str,
+    settings: Settings | None = None,
+) -> None:
+    """Delete an object from S3."""
+    settings = settings or get_settings()
+    client_kwargs = {
+        "region_name": settings.aws_region,
+        "aws_access_key_id": settings.aws_access_key_id,
+        "aws_secret_access_key": settings.aws_secret_access_key,
+    }
+    if settings.aws_session_token:
+        client_kwargs["aws_session_token"] = settings.aws_session_token
+    s3 = boto3.client("s3", **client_kwargs)
+    s3.delete_object(Bucket=settings.s3_bucket_name, Key=s3_key)
+    logger.info("Deleted S3 object: s3://%s/%s", settings.s3_bucket_name, s3_key)
 
 
 def _validate_s3_settings(settings: Settings) -> None:
