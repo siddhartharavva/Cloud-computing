@@ -16,9 +16,12 @@ spec:
     spec:
       containers:
       - name: lifecycle
-        image: <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/zerotrust-lifecycle:latest
+        image: 494003775847.dkr.ecr.eu-north-1.amazonaws.com/zerotrust-lifecycle:latest
         ports:
         - containerPort: 80
+        envFrom:
+        - secretRef:
+            name: backend-env
 ---
 apiVersion: v1
 kind: Service

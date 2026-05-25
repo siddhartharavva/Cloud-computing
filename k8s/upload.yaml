@@ -16,13 +16,12 @@ spec:
     spec:
       containers:
       - name: upload
-        image: <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/zerotrust-upload:latest
+        image: 494003775847.dkr.ecr.eu-north-1.amazonaws.com/zerotrust-upload:latest
         ports:
         - containerPort: 80
-        env:
-        # Define necessary AWS environment variables or use IAM Roles for Service Accounts (IRSA)
-        - name: DYNAMODB_TABLE_NAME
-          value: "ZeroTrustFiles"
+        envFrom:
+        - secretRef:
+            name: backend-env
 ---
 apiVersion: v1
 kind: Service

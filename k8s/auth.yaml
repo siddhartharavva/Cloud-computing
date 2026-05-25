@@ -16,9 +16,12 @@ spec:
     spec:
       containers:
       - name: auth
-        image: <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/zerotrust-auth:latest
+        image: 494003775847.dkr.ecr.eu-north-1.amazonaws.com/zerotrust-auth:latest
         ports:
         - containerPort: 80
+        envFrom:
+        - secretRef:
+            name: backend-env
         env:
         - name: COGNITO_USER_POOL_ID
           value: "eu-north-1_i5O7IJ3CU"

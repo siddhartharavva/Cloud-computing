@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/zerotrust-frontend:latest
+        image: 494003775847.dkr.ecr.eu-north-1.amazonaws.com/zerotrust-frontend:latest
         ports:
         - containerPort: 80
 ---
